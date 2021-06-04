@@ -131,6 +131,13 @@ escrowValidator = Scripts.validatorScript escrowInstance
 escrowAddress :: Address
 escrowAddress = Ledger.scriptAddress escrowValidator
 
+-- Utils for known tokens
+makeTokenInfo :: TokenName -> Contract EscrowSchema Text TokenInfo
+makeTokenInfo "S"  = return $ TokenInfo "73" "S"
+makeTokenInfo "F" = return $ TokenInfo "66" "F"
+makeTokenInfo "T"  = return $ TokenInfo "74" "T"
+makeTokenInfo _ = throwError "unrecognized token name"
+
 -- | The "sell" contract endpoint
 sell :: Contract EscrowSchema Text ()
 sell = do 
@@ -185,7 +192,8 @@ filterByNFT tinf@TokenInfo{..} =
 -- Get datum from the unique unspent output containing a Non Fungible Token
 getDatumFromUtxo :: UtxoMap -> TokenInfo -> Contract EscrowSchema Text SellInfo
 getDatumFromUtxo utxos tinf@TokenInfo{..} = 
-    let us = filterByNFT utxos
+    let us = filterByNFT tinf utxos 
+    in
     case Map.toList us of
         [(oref, o)] -> case txOutType $ txOutTxOut o of
             PayToPubKey   -> throwError "unexpected out type"
@@ -217,11 +225,3 @@ tToken :: KnownCurrency
 tToken = KnownCurrency (ValidatorHash "t") "Token" (TokenName "T" :| [])
 
 mkKnownCurrencies ['sToken,'fToken,'tToken]
-
--- Utils for known tokens
-makeTokenInfo :: TokenName -> Contract EscrowSchema Text TokenInfo
-makeTokenInfo "S"  = return $ TokenInfo "73" "S"
-makeTokenInfo "F" = return $ TokenInfo "66" "F"
-makeTokenInfo "T"  = return $ TokenInfo "74" "T"
-makeTokenInfo _ = throwError "unrecognized token name"
-
