@@ -118,9 +118,9 @@ escrowAddress :: Address
 escrowAddress = Ledger.scriptAddress escrowValidator
 
 makeTokenInfo :: TokenName -> Contract EscrowSchema Text TokenInfo
-makeTokenInfo "Santi"  = return $ TokenInfo "73" "Santi"
-makeTokenInfo "Flavio" = return $ TokenInfo "66" "Flavio"
-makeTokenInfo "Tomaz"  = return $ TokenInfo "74" "Tomaz"
+makeTokenInfo "S"  = return $ TokenInfo "73" "S"
+makeTokenInfo "F" = return $ TokenInfo "66" "F"
+makeTokenInfo "T"  = return $ TokenInfo "74" "T"
 makeTokenInfo _ = throwError "unrecognized token name"
 
 -- | The "sell" contract endpoint
