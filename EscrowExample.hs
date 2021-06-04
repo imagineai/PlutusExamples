@@ -201,12 +201,12 @@ endpoints = escrow
 mkSchemaDefinitions ''EscrowSchema
 
 santiToken :: KnownCurrency
-santiToken = KnownCurrency (ValidatorHash "s") "Token" (TokenName "Santi" :| [])
+santiToken = KnownCurrency (ValidatorHash "s") "Token" (TokenName "S" :| [])
 
 flavioToken :: KnownCurrency
-flavioToken = KnownCurrency (ValidatorHash "f") "Token" (TokenName "Flavio" :| [])
+flavioToken = KnownCurrency (ValidatorHash "f") "Token" (TokenName "F" :| [])
 
 tomazToken :: KnownCurrency
-tomazToken = KnownCurrency (ValidatorHash "t") "Token" (TokenName "Tomaz" :| [])
+tomazToken = KnownCurrency (ValidatorHash "t") "Token" (TokenName "T" :| [])
 
 mkKnownCurrencies ['santiToken,'flavioToken,'tomazToken]
