@@ -14,6 +14,7 @@
 {-# LANGUAGE TypeApplications           #-}
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE TypeOperators              #-}
+
 -- A escrow contract where someone can exchange an NFT for
 -- another specified NFT, or for a predefined amount of ADA.
 -- If someone wants to get this token, can choose between paying 
@@ -36,6 +37,8 @@ import qualified Prelude
 import Prelude ((<$>))
 import           Text.Printf          (printf)
 ------------------------------------------------------------
+
+-- Information of a token
 data TokenInfo = TokenInfo { currency  :: !CurrencySymbol
                            , tokenName :: !TokenName
                            }
@@ -49,6 +52,9 @@ instance Eq TokenInfo where
 PlutusTx.makeIsData ''TokenInfo
 PlutusTx.makeLift ''TokenInfo
 
+-- Information a sale, containing the address of the seller,
+-- the information of the NFT in sale and two possible prices:
+-- another NFT or an amount of ADA.
 data SellInfo = SellInfo { seller          :: !PubKeyHash
                          -- token on sale
                          , sellNFT    :: !TokenInfo
@@ -62,6 +68,8 @@ data SellInfo = SellInfo { seller          :: !PubKeyHash
 PlutusTx.makeIsData ''SellInfo
 PlutusTx.makeLift ''SellInfo
 
+-- Information for buying an NFT: the token information of the
+-- payment or an amount of ADA.
 data BuyInfo = BuyWithNFT !TokenInfo
              | BuyWithADA !Integer 
     deriving Show
@@ -69,6 +77,7 @@ data BuyInfo = BuyWithNFT !TokenInfo
 PlutusTx.makeIsData ''BuyInfo
 PlutusTx.makeLift ''BuyInfo
 
+-- Parameters for receiving sale information in the simulator
 data SellParams = SellParams { spSellNFT    :: !TokenName
                              -- token to receive
                              , spBuyNFT     :: !TokenName
@@ -77,16 +86,21 @@ data SellParams = SellParams { spSellNFT    :: !TokenName
                              }
     deriving (Generic, ToJSON, FromJSON, ToSchema)
 
+-- Parameters for receiving information in the simulator for buying
+-- using a NFT.
 data BuyWithNFTParams = BuyWithNFTParams { bpSellNFT  :: !TokenName
                                          , bpBuyNFT   :: !TokenName
                                          }
     deriving (Generic, ToJSON, FromJSON, ToSchema)
 
+-- Parameters for receiving information in the simulator for buying
+-- using ADA.
 data BuyWithADAParams = BuyWithADAParams { bpWASellNFT  :: !TokenName
                                          , bpAmountADA  :: !Integer
                                          }
     deriving (Generic, ToJSON, FromJSON, ToSchema)
 
+-- The schema of available actions in the constract
 type EscrowSchema =
     BlockchainActions
         .\/ Endpoint "sell" SellParams
@@ -116,12 +130,6 @@ escrowValidator = Scripts.validatorScript escrowInstance
 -- | The address of the escrow (the hash of its validator script)
 escrowAddress :: Address
 escrowAddress = Ledger.scriptAddress escrowValidator
-
-makeTokenInfo :: TokenName -> Contract EscrowSchema Text TokenInfo
-makeTokenInfo "S"  = return $ TokenInfo "73" "S"
-makeTokenInfo "F" = return $ TokenInfo "66" "F"
-makeTokenInfo "T"  = return $ TokenInfo "74" "T"
-makeTokenInfo _ = throwError "unrecognized token name"
 
 -- | The "sell" contract endpoint
 sell :: Contract EscrowSchema Text ()
@@ -169,18 +177,16 @@ buyWithADA = do
               Constraints.mustPayToPubKey seller v
     void (submitTxConstraintsSpending escrowInstance unspentOutputs tx)
 
-
+-- Filter unspent outputs by a Non Fungible Token
 filterByNFT ::  TokenInfo -> UtxoMap -> UtxoMap
 filterByNFT tinf@TokenInfo{..} = 
     Map.filter (\o -> Value.valueOf (txOutValue $ txOutTxOut o) currency tokenName == 1)
 
+-- Get datum from the unique unspent output containing a Non Fungible Token
 getDatumFromUtxo :: UtxoMap -> TokenInfo -> Contract EscrowSchema Text SellInfo
 getDatumFromUtxo utxos tinf@TokenInfo{..} = 
-    let xs = [ (oref, o)
-             | (oref, o) <- Map.toList utxos
-             , Value.valueOf (txOutValue $ txOutTxOut o) currency tokenName == 1
-             ] in
-    case xs of
+    let us = filterByNFT utxos
+    case Map.toList us of
         [(oref, o)] -> case txOutType $ txOutTxOut o of
             PayToPubKey   -> throwError "unexpected out type"
             PayToScript h -> case Map.lookup h $ txData $ txOutTxTx o of
@@ -200,6 +206,7 @@ endpoints = escrow
 
 mkSchemaDefinitions ''EscrowSchema
 
+-- The predefined known tokens
 sToken :: KnownCurrency
 sToken = KnownCurrency (ValidatorHash "s") "Token" (TokenName "S" :| [])
 
@@ -210,3 +217,11 @@ tToken :: KnownCurrency
 tToken = KnownCurrency (ValidatorHash "t") "Token" (TokenName "T" :| [])
 
 mkKnownCurrencies ['sToken,'fToken,'tToken]
+
+-- Utils for known tokens
+makeTokenInfo :: TokenName -> Contract EscrowSchema Text TokenInfo
+makeTokenInfo "S"  = return $ TokenInfo "73" "S"
+makeTokenInfo "F" = return $ TokenInfo "66" "F"
+makeTokenInfo "T"  = return $ TokenInfo "74" "T"
+makeTokenInfo _ = throwError "unrecognized token name"
+
